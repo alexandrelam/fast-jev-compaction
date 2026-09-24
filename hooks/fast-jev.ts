@@ -9,7 +9,12 @@ import type {
 } from 'claude-code';
 
 import { compact, reductionRatio, resolveOptions } from '../src/compact.js';
-import { buildJevRequest, DEFAULT_MODEL, parseJevResponse } from '../src/request.js';
+import {
+  buildOpenRouterRequest,
+  OPENROUTER_JEV_MODEL,
+  openRouterErrorMessage,
+} from '../src/openrouter.js';
+import { parseJevResponse } from '../src/request.js';
 import type {
   CompactOptions,
   CompactResult,
@@ -22,7 +27,7 @@ import type {
 const HOOK_DEFAULTS = {
   compactAtPercent: 60,
   minReductionRatio: 0.25,
-  model: DEFAULT_MODEL,
+  model: OPENROUTER_JEV_MODEL,
 };
 
 export type HookFetchInit = {
@@ -42,6 +47,7 @@ export type HookFetch = (url: string, init?: HookFetchInit) => Promise<HookFetch
 
 export type HookConfig = CompactOptions & {
   apiKey?: string;
+  baseUrl?: string;
   compactAtPercent: number;
   minReductionRatio: number;
   model: string;
@@ -82,21 +88,33 @@ export function resolveHookConfig(options: PluginOptions): HookConfig {
   };
   const apiKey = optionString(options, 'apiKey');
   if (apiKey) config.apiKey = apiKey;
+  const baseUrl = optionString(options, 'baseUrl');
+  if (baseUrl) config.baseUrl = baseUrl;
   const goal = optionString(options, 'goal');
   if (goal) config.goal = goal;
   return config;
 }
 
-/** A `JevAsker` over the engine's `$.http.fetch`. */
-export function jevAsker(fetchFn: HookFetch, apiKey: string, model: string): JevAsker {
+/** A `JevAsker` over the engine's `$.http.fetch`, pointed at OpenRouter. */
+export function jevAsker(
+  fetchFn: HookFetch,
+  params: { apiKey: string; model: string; baseUrl?: string },
+): JevAsker {
   return {
     async ask(state, questions) {
-      const request = buildJevRequest({ apiKey, model }, state, questions);
+      const request = buildOpenRouterRequest(
+        { ...params, title: 'fast-jev-compaction' },
+        state,
+        questions,
+      );
       const response = await fetchFn(request.url, {
         method: request.method,
         headers: request.headers,
         body: request.body,
       });
+      if (!response.ok) {
+        throw new Error(openRouterErrorMessage(response.status, response.text));
+      }
       return parseJevResponse(response.status, response.ok, response.text);
     },
   };
@@ -167,8 +185,13 @@ export async function compactSession(
   config: HookConfig,
   fetchFn: HookFetch,
 ): Promise<SessionCompaction> {
-  if (!config.apiKey) throw new Error('TYPESAFE_API_KEY is not configured');
-  const result = await compact(messages, jevAsker(fetchFn, config.apiKey, config.model), config);
+  if (!config.apiKey) throw new Error('OPENROUTER_API_KEY is not configured');
+  const asker = jevAsker(fetchFn, {
+    apiKey: config.apiKey,
+    model: config.model,
+    ...(config.baseUrl ? { baseUrl: config.baseUrl } : {}),
+  });
+  const result = await compact(messages, asker, config);
   return { result, messages: toSessionMessages(messages, result.messages) };
 }
 
@@ -232,12 +255,12 @@ async function getApiKey(
   config: HookConfig,
 ): Promise<string | undefined> {
   if (config.apiKey) return config.apiKey;
-  const fromEnv = await $.env.get('TYPESAFE_API_KEY');
+  const fromEnv = await $.env.get('OPENROUTER_API_KEY');
   if (fromEnv) return fromEnv;
   const settings = await $.settings.read();
   const env = settings['env'];
   if (env && typeof env === 'object') {
-    const value = (env as Record<string, unknown>)['TYPESAFE_API_KEY'];
+    const value = (env as Record<string, unknown>)['OPENROUTER_API_KEY'];
     if (typeof value === 'string' && value) return value;
   }
   return undefined;

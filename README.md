@@ -60,11 +60,17 @@ fitted throw; the caller (or the Claude Code hook) decides what to fall back to.
 
 ```sh
 npm install fast-jev-compaction
-export TYPESAFE_API_KEY=...
+export OPENROUTER_API_KEY=sk-or-v1-...   # or TYPESAFE_API_KEY to call TypeSafe directly
 ```
 
+Jev is served both by TypeSafe and by OpenRouter's Decisions API, which speaks
+the same protocol (`state` + `questions` in, calibrated `answers` out) under the
+slug `~typesafe/jev-latest`. `compactMessagesOpenRouter` and the Claude Code
+plugin use OpenRouter; `compactMessages` calls TypeSafe. Nothing else differs —
+there is no chat model in the loop either way.
+
 ```ts
-import { compactMessages, reductionRatio, type Message } from 'fast-jev-compaction';
+import { compactMessagesOpenRouter, reductionRatio, type Message } from 'fast-jev-compaction';
 
 const transcript: Message[] = [
   { role: 'user', text: 'Fix the failing test. Never edit src/generated.', toolUses: [] },
@@ -77,7 +83,7 @@ const transcript: Message[] = [
   // …
 ];
 
-const result = await compactMessages(transcript, { preserveRecentMessages: 4 });
+const result = await compactMessagesOpenRouter(transcript, { preserveRecentMessages: 4 });
 console.log(result.messages, result.decisions, result.stats);
 if (reductionRatio(result) < 0.25) {
   // not worth it: keep the original transcript, or summarize instead
@@ -93,16 +99,18 @@ method) and call `compact(messages, asker, options)`; `buildJevRequest` and
 The building blocks (`collectToolCalls`, `fitState`, `batchCalls`,
 `decideCall`, `applyDecisions`) are exported too.
 
-`apiKey` defaults to `process.env.TYPESAFE_API_KEY`. Never commit the key or
-put it in a source file.
+`apiKey` defaults to `process.env.OPENROUTER_API_KEY` (`OpenRouterClient`) or
+`process.env.TYPESAFE_API_KEY` (`JevClient`). Never commit the key or put it in
+a source file.
 
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `apiKey` | `TYPESAFE_API_KEY` | TypeSafe API key (`compactMessages`/`JevClient`) |
-| `model` | `jev-latest` | Jev model name |
-| `baseUrl` | `https://api.typesafe.ai/v1/systemone` | System One endpoint |
+| `apiKey` | `OPENROUTER_API_KEY` | OpenRouter key (`compactMessagesOpenRouter`/`OpenRouterClient`); `TYPESAFE_API_KEY` for `compactMessages`/`JevClient` |
+| `model` | `~typesafe/jev-latest` | Jev model slug (`jev-latest` on the TypeSafe path) |
+| `baseUrl` | `https://openrouter.ai/api/alpha/decisions` | Decisions endpoint (`https://api.typesafe.ai/v1/systemone` on the TypeSafe path) |
+| `referer`, `title` | unset | Optional OpenRouter attribution headers |
 | `fetch` | native `fetch` | Injectable fetch implementation for tests |
 | `goal` | last 3 user prompts | Ongoing task description included in the state |
 | `keepThreshold` | `0.5` | Minimum keep probability for a call or result to stay |
@@ -139,7 +147,7 @@ Function hooks are an early-access Claude Code feature (2.1.274+), so the
 opt-in flag must be set wherever Claude Code runs, e.g. in `~/.claude/settings.json`:
 
 ```json
-{ "env": { "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1", "TYPESAFE_API_KEY": "<your key>" } }
+{ "env": { "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1", "OPENROUTER_API_KEY": "<your key>" } }
 ```
 
 Then add this repository as a plugin marketplace and install the plugin,
@@ -151,7 +159,9 @@ claude plugin install fast-jev-compaction@fast-jev-compaction
 ```
 
 The install prompts for the plugin options (API key, thresholds, `truncateHeadChars`,
-…); leave them at their defaults to use `TYPESAFE_API_KEY` from the environment.
+…); leave them at their defaults to use `OPENROUTER_API_KEY` from the
+environment and `~typesafe/jev-latest` through OpenRouter. Point `baseUrl` at
+`https://api.typesafe.ai/v1/systemone` to call TypeSafe directly instead.
 Restart Claude Code or run `/reload-plugins`. From then on `/compact` (and
 auto-compaction) goes through Jev: the toast reads
 `fast-jev-compaction: kept N/M messages, no summary (…)` when the pruned history
@@ -170,10 +180,10 @@ npm run typecheck        # library + hook
 npm test
 npm run build
 npm run validate:plugin  # claude plugin validate
-TYPESAFE_API_KEY="$(cat ~/.typesafe_key)" npm run demo
+OPENROUTER_API_KEY="$(cat ~/.config/openrouter.key)" npm run demo
 ```
 
-The unit tests use a fake Jev and never contact TypeSafe. The demo is the live
+The unit tests use a fake Jev and never contact OpenRouter or TypeSafe. The demo is the live
 network check.
 
 ## Animated demo (macOS)
