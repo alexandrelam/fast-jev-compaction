@@ -102,11 +102,9 @@ export function jevAsker(
 ): JevAsker {
   return {
     async ask(state, questions) {
-      const request = buildOpenRouterRequest(
-        { ...params, title: 'fast-jev-compaction' },
-        state,
-        questions,
-      );
+      // No attribution headers: they are opt-in, and they would list the
+      // session on OpenRouter's public leaderboards.
+      const request = buildOpenRouterRequest(params, state, questions);
       const response = await fetchFn(request.url, {
         method: request.method,
         headers: request.headers,
