@@ -55,13 +55,13 @@
     "model": {
       "type": "string",
       "title": "Jev model",
-      "description": "Jev model slug on OpenRouter.",
+      "description": "Jev model slug. Left at its default it follows baseUrl (~typesafe/jev-latest on OpenRouter, jev-latest on TypeSafe); set it to pin a version, e.g. typesafe/jev-1.13.",
       "default": "~typesafe/jev-latest"
     },
     "baseUrl": {
       "type": "string",
       "title": "Decisions endpoint",
-      "description": "Jev Decisions API URL. Defaults to OpenRouter; set https://api.typesafe.ai/v1/systemone to call TypeSafe directly.",
+      "description": "Jev Decisions API URL. Defaults to OpenRouter; set https://api.typesafe.ai/v1/systemone to call TypeSafe directly, which is the only option you need to change (the default model slug and the API key environment variable both follow the endpoint).",
       "default": "https://openrouter.ai/api/alpha/decisions"
     }
   }

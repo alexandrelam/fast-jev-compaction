@@ -4,7 +4,8 @@ import {
   buildOpenRouterRequest,
   OPENROUTER_DECISIONS_URL,
   OPENROUTER_JEV_MODEL,
-  openRouterErrorMessage,
+  decisionsErrorMessage,
+  resolveDecisionsEndpoint,
 } from '../src/openrouter.js';
 import { OpenRouterClient } from '../src/openrouter-client.js';
 import type { JevQuestions } from '../src/types.js';
@@ -48,18 +49,30 @@ describe('buildOpenRouterRequest', () => {
   });
 });
 
-describe('openRouterErrorMessage', () => {
+describe('decisionsErrorMessage', () => {
   it('surfaces the error message from an OpenRouter envelope', () => {
     expect(
-      openRouterErrorMessage(402, JSON.stringify({ error: { message: 'Insufficient credits', code: 402 } })),
-    ).toBe('OpenRouter request failed (402): Insufficient credits');
+      decisionsErrorMessage(
+        402,
+        JSON.stringify({ error: { message: 'Insufficient credits', code: 402 } }),
+        OPENROUTER_DECISIONS_URL,
+      ),
+    ).toBe('openrouter.ai request failed (402): Insufficient credits');
+  });
+
+  it('names the host that actually failed', () => {
+    expect(
+      decisionsErrorMessage(401, 'nope', 'https://api.typesafe.ai/v1/systemone'),
+    ).toBe('api.typesafe.ai request failed (401): nope');
   });
 
   it('falls back to the raw body', () => {
-    expect(openRouterErrorMessage(502, 'upstream down')).toBe(
-      'OpenRouter request failed (502): upstream down',
+    expect(decisionsErrorMessage(502, 'upstream down', OPENROUTER_DECISIONS_URL)).toBe(
+      'openrouter.ai request failed (502): upstream down',
     );
-    expect(openRouterErrorMessage(500, JSON.stringify({ nope: 1 }))).toContain('{"nope":1}');
+    expect(
+      decisionsErrorMessage(500, JSON.stringify({ nope: 1 }), OPENROUTER_DECISIONS_URL),
+    ).toContain('{"nope":1}');
   });
 });
 
@@ -106,9 +119,37 @@ describe('OpenRouterClient', () => {
   });
 
   it('throws without a key', async () => {
-    delete process.env.OPENROUTER_API_KEY;
+    // '' is not nullish, so the constructor never consults process.env here.
     await expect(new OpenRouterClient({ apiKey: '' }).ask('s', questions)).rejects.toThrow(
       /OPENROUTER_API_KEY/,
     );
+  });
+});
+
+describe('resolveDecisionsEndpoint', () => {
+  it('defaults to OpenRouter and its namespaced slug', () => {
+    expect(resolveDecisionsEndpoint({})).toEqual({
+      url: OPENROUTER_DECISIONS_URL,
+      model: OPENROUTER_JEV_MODEL,
+    });
+  });
+
+  it('swaps a default slug for the one the chosen host uses', () => {
+    // The plugin ships the OpenRouter slug as its default, so changing only
+    // baseUrl must not send TypeSafe a slug it does not know.
+    expect(
+      resolveDecisionsEndpoint({
+        baseUrl: 'https://api.typesafe.ai/v1/systemone',
+        model: OPENROUTER_JEV_MODEL,
+      }),
+    ).toEqual({ url: 'https://api.typesafe.ai/v1/systemone', model: 'jev-latest' });
+    expect(resolveDecisionsEndpoint({ model: 'jev-latest' })).toEqual({
+      url: OPENROUTER_DECISIONS_URL,
+      model: OPENROUTER_JEV_MODEL,
+    });
+  });
+
+  it('leaves an explicitly pinned slug alone', () => {
+    expect(resolveDecisionsEndpoint({ model: 'typesafe/jev-1.13' }).model).toBe('typesafe/jev-1.13');
   });
 });

@@ -110,7 +110,7 @@ a source file.
 | `apiKey` | `OPENROUTER_API_KEY` | OpenRouter key (`compactMessagesOpenRouter`/`OpenRouterClient`); `TYPESAFE_API_KEY` for `compactMessages`/`JevClient` |
 | `model` | `~typesafe/jev-latest` | Jev model slug (`jev-latest` on the TypeSafe path) |
 | `baseUrl` | `https://openrouter.ai/api/alpha/decisions` | Decisions endpoint (`https://api.typesafe.ai/v1/systemone` on the TypeSafe path) |
-| `referer`, `title` | unset | Optional OpenRouter attribution headers |
+| `referer`, `title` | unset | Optional OpenRouter attribution headers; setting them lists the app on OpenRouter's public leaderboards |
 | `fetch` | native `fetch` | Injectable fetch implementation for tests |
 | `goal` | last 3 user prompts | Ongoing task description included in the state |
 | `keepThreshold` | `0.5` | Minimum keep probability for a call or result to stay |
@@ -161,7 +161,9 @@ claude plugin install fast-jev-compaction@fast-jev-compaction
 The install prompts for the plugin options (API key, thresholds, `truncateHeadChars`,
 …); leave them at their defaults to use `OPENROUTER_API_KEY` from the
 environment and `~typesafe/jev-latest` through OpenRouter. Point `baseUrl` at
-`https://api.typesafe.ai/v1/systemone` to call TypeSafe directly instead.
+`https://api.typesafe.ai/v1/systemone` to call TypeSafe directly instead — the
+default slug follows the endpoint, and `TYPESAFE_API_KEY` is read as a fallback,
+so that is the only option you need to change.
 Restart Claude Code or run `/reload-plugins`. From then on `/compact` (and
 auto-compaction) goes through Jev: the toast reads
 `fast-jev-compaction: kept N/M messages, no summary (…)` when the pruned history

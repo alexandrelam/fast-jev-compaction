@@ -12,7 +12,7 @@ import { compact, reductionRatio, resolveOptions } from '../src/compact.js';
 import {
   buildOpenRouterRequest,
   OPENROUTER_JEV_MODEL,
-  openRouterErrorMessage,
+  decisionsErrorMessage,
 } from '../src/openrouter.js';
 import { parseJevResponse } from '../src/request.js';
 import type {
@@ -111,7 +111,7 @@ export function jevAsker(
         body: request.body,
       });
       if (!response.ok) {
-        throw new Error(openRouterErrorMessage(response.status, response.text));
+        throw new Error(decisionsErrorMessage(response.status, response.text, request.url));
       }
       return parseJevResponse(response.status, response.ok, response.text);
     },
@@ -255,11 +255,17 @@ async function getApiKey(
   if (config.apiKey) return config.apiKey;
   const fromEnv = await $.env.get('OPENROUTER_API_KEY');
   if (fromEnv) return fromEnv;
+  // Installs predating the OpenRouter switch, and anyone pointing baseUrl at
+  // TypeSafe, still keep the key under the old name.
+  const legacyEnv = await $.env.get('TYPESAFE_API_KEY');
+  if (legacyEnv) return legacyEnv;
   const settings = await $.settings.read();
   const env = settings['env'];
   if (env && typeof env === 'object') {
-    const value = (env as Record<string, unknown>)['OPENROUTER_API_KEY'];
-    if (typeof value === 'string' && value) return value;
+    const record = env as Record<string, unknown>;
+    for (const value of [record['OPENROUTER_API_KEY'], record['TYPESAFE_API_KEY']]) {
+      if (typeof value === 'string' && value) return value;
+    }
   }
   return undefined;
 }

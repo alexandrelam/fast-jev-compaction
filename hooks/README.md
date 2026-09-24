@@ -3,7 +3,7 @@
 This plugin uses Claude Code function hooks to replace a compaction with the
 original messages, minus the tool calls and tool results Jev judged no longer
 needed. `hooks/fast-jev.ts` is a thin adapter: it reads the plugin options,
-finds the TypeSafe key, hands `session.compact` transcripts to the
+finds the OpenRouter key, hands `session.compact` transcripts to the
 `fast-jev-compaction` library in `src/` (the plugin folder is the repository
 root, so the hook imports it directly) and maps the result back onto session
 messages. User and assistant text is never touched. Jev is sent the whole
@@ -29,7 +29,7 @@ hooks surface before installing or loading it:
 
 ```sh
 export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1
-export TYPESAFE_API_KEY="<your TypeSafe key>"
+export OPENROUTER_API_KEY="sk-or-v1-..."
 
 claude plugin marketplace add tamaratran/fast-jev-compaction
 claude plugin install fast-jev-compaction@fast-jev-compaction
@@ -55,15 +55,23 @@ The plugin declares these `userConfig` values in
 | `maxStateTokens` | `25000` |
 | `maxRequestTokens` | `30000` |
 | `truncateHeadChars` | `300` |
-| `model` | `jev-latest` |
+| `model` | `~typesafe/jev-latest` |
+| `baseUrl` | `https://openrouter.ai/api/alpha/decisions` |
 
-The TypeSafe key can be supplied as the sensitive `apiKey` plugin option or
-through `TYPESAFE_API_KEY`. The environment variable is the recommended
-development setup.
+Jev is reached through OpenRouter's Decisions API, which speaks the same
+protocol as TypeSafe's System One. The key can be supplied as the sensitive
+`apiKey` plugin option or through `OPENROUTER_API_KEY`; the environment
+variable is the recommended development setup. `TYPESAFE_API_KEY` is still read
+as a fallback, so installs predating the OpenRouter switch keep working.
 
-Every option except `apiKey`, `compactAtPercent`, `minReductionRatio` and
-`model` is passed straight to the library; see the root README for what they
-do. The `session.compact` hook runs the Jev requests concurrently. If Jev fails,
+Set `baseUrl` to `https://api.typesafe.ai/v1/systemone` to call TypeSafe
+directly instead. The default `model` follows the endpoint (`~typesafe/jev-latest`
+on OpenRouter, `jev-latest` on TypeSafe), so switching `baseUrl` is enough;
+pin a specific version (`typesafe/jev-1.13`) through `model` if you want one.
+
+Every option except `apiKey`, `baseUrl`, `compactAtPercent`,
+`minReductionRatio` and `model` is passed straight to the library; see the root
+README for what they do. The `session.compact` hook runs the Jev requests concurrently. If Jev fails,
 the response is malformed, the key is unavailable, the history cannot be
 fitted into the state budget, or the estimated reduction is below
 `minReductionRatio`, the hook logs a fallback and delegates to Claude Code's

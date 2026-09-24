@@ -1,4 +1,8 @@
-import { buildOpenRouterRequest, openRouterErrorMessage, type OpenRouterParams } from './openrouter.js';
+import {
+  buildOpenRouterRequest,
+  decisionsErrorMessage,
+  type OpenRouterParams,
+} from './openrouter.js';
 import { parseJevResponse } from './request.js';
 import type { JevAsker, JevQuestions, JevResponse, JevState } from './types.js';
 
@@ -34,7 +38,7 @@ export class OpenRouterClient implements JevAsker {
       body: request.body,
     });
     const text = await response.text();
-    if (!response.ok) throw new Error(openRouterErrorMessage(response.status, text));
+    if (!response.ok) throw new Error(decisionsErrorMessage(response.status, text, request.url));
     return parseJevResponse(response.status, response.ok, text);
   }
 }
